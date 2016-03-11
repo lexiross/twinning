@@ -1,13 +1,12 @@
 # twinning
 Compare the result of a new async function against an old async function.
 ```js
-function findCatsById (id, cb) {
-  return compare({
-    name: "findCatsById",
-    oldFn: OldDatabase.findCatsById,
-    newFn: NewDatabase.findCatsById
-  });
-}
+const findCatsById = twinning({
+  name: "findCatsById",
+  oldFn: OldDatabase.findCatsById,
+  newFn: NewDatabase.findCatsById
+  onDiff: diffLoggingFunction
+});
 ```
 It's called twinning because in an ideal world, you want your old function and new function to be twins :)
 

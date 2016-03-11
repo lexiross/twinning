@@ -1,4 +1,4 @@
-diff = require ("deep-diff").diff
+diff = require("deep-diff").diff
 twinning = ({name, newFn, oldFn, onNewFnError, onDiffs}) -> (args..., cb) ->
   oldResult = null
   newResult = null

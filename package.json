@@ -19,9 +19,10 @@
   },
   "version": "1.0.0",
   "devDependencies": {
-    "coffee-script": "^1.10.0",
+    "coffee-script": "1.9.3",
     "expect.js": "^0.3.1",
-    "mocha": "^2.4.5"
+    "mocha": "2.2.5",
+    "sinon": "^1.17.3"
   },
   "dependencies": {
     "deep-diff": "^0.3.3"

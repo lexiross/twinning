@@ -1,7 +1,7 @@
 # twinning
-Compare the result of a new async function against an old async function
+Compare the result of a new async function against an old async function.
 ```js
-function findCatsById (id) {
+function findCatsById (id, cb) {
   return compare({
     name: "findCatsById",
     oldFn: OldDatabase.findCatsById,
@@ -9,6 +9,7 @@ function findCatsById (id) {
   });
 }
 ```
+It's called twinning because in an ideal world, you want your old function and new function to be twins :)
 
 ## Setup
 
@@ -39,11 +40,10 @@ You can call `twinning` with the following parameters, any of which can be speci
 - `oldFn`: The original function. It's assumed that this function is currently being used in production, and the results can be trusted. The function must take a callback as its last argument.
 - `newFn`: The new function to compare. We assume this function is not yet reliable, so `twinning` will call `oldFn`'s callback after running the comparison. The function must take a callback as its last argument.
 - `onNewFnError`: A function that will be called when `newFn` errors (when `oldFn` errors, we will simply call its callback with the error). This function will be called with two arguments: `name` and `err`. You might want to use this option to log or throw the error.
-- `onDiffs`: A function that will be called when `newFn` yields a different result than `oldFn`. The function will be called with the following arguments:
+- `onDiffs`: A function that will be called when `newFn` yields a different result than `oldFn`. You might want to use this function to log differences, or perhaps throw. The function will be called with the following arguments:
   - `name`: see above
   - `diffs`: an array of change records between the results of `oldFn` and `newFn`. We've used [deep-diff](https://github.com/flitbit/diff) to implement the comparison; see their API for an overview of the structure of change records.
-  You might want to use this function to log differences, or perhaps throw.
-
+  
 ### Notes
 - The function won't return until both `oldFn` and `newFn` have completed.
 - Currently, this module only supports comparing async functions with callbacks, but we plan to support synchronous and promise-based functions in the future.

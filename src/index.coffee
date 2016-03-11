@@ -22,7 +22,8 @@ twinning = ({name, newFn, oldFn, onNewFnError, onDiffs}) -> (args..., cb) ->
 
   newPartial (err, result) ->
     if err?
-      onNewFnError name, err
+      if onNewFnError?
+        onNewFnError name, err
       newErrored = true
       if oldFinished
         return cb null, oldResult
@@ -34,7 +35,7 @@ twinning = ({name, newFn, oldFn, onNewFnError, onDiffs}) -> (args..., cb) ->
 
   onFinish = () ->
     differences = diff oldResult, newResult
-    if differences?
+    if differences? and onDiffs?
       onDiffs name, differences
     return cb null, oldResult
 

@@ -26,5 +26,11 @@
   },
   "dependencies": {
     "deep-diff": "^0.3.3"
+  },
+  "keywords": {
+    "compare",
+    "comparison",
+    "diff",
+    "update"
   }
 }

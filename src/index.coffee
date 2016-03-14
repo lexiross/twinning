@@ -52,8 +52,10 @@ twinning = ({name, newFn, oldFn, onNewFnError, onDiffs, sync, promises}) -> (arg
           oldFinished = true
           oldResult = result
           if newFinished
-            findAndHandleDiffs()
-            resolve(oldResult)
+            # run diff in next tick so exceptions don't get caught
+            process.nextTick ->
+              findAndHandleDiffs()
+              resolve(oldResult)
           else if newErrored
             resolve(oldResult)
         .catch (err) ->
@@ -63,8 +65,10 @@ twinning = ({name, newFn, oldFn, onNewFnError, onDiffs, sync, promises}) -> (arg
           newFinished = true
           newResult = result
           if oldFinished
-            findAndHandleDiffs()
-            resolve(oldResult)
+            # run diff in next tick so exceptions don't get caught
+            process.nextTick ->
+              findAndHandleDiffs()
+              resolve(oldResult)
         .catch (err) ->
           if onNewFnError?
             onNewFnError name, err

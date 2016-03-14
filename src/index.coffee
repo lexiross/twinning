@@ -47,7 +47,7 @@ twinning = ({name, newFn, oldFn, onNewFnError, onDiffs, sync, promises}) -> (arg
 
   else if promises
     return new Promise (resolve, reject) ->
-      oldFn args
+      oldFn args...
         .then (result) ->
           oldFinished = true
           oldResult = result
@@ -58,7 +58,7 @@ twinning = ({name, newFn, oldFn, onNewFnError, onDiffs, sync, promises}) -> (arg
             resolve(oldResult)
         .catch (err) ->
           reject(err)
-      newFn args
+      newFn args...
         .then (result) ->
           newFinished = true
           newResult = result
@@ -73,9 +73,9 @@ twinning = ({name, newFn, oldFn, onNewFnError, onDiffs, sync, promises}) -> (arg
             resolve(oldResult)
 
   else if sync
-    oldResult = oldFn args
+    oldResult = oldFn args...
     try
-      newResult = newFn args
+      newResult = newFn args...
     catch err
       if onNewFnError?
         onNewFnError name, err

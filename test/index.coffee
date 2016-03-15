@@ -1,3 +1,4 @@
+domain   = require "domain"
 twinning = require "../src"
 sinon    = require "sinon"
 expect   = require "expect.js"
@@ -28,14 +29,15 @@ describe "twinning async functions", ->
   sameFn = (cb) ->
     setTimeout (() -> cb(null, oldResult)), 0
 
-  params =
-    name: "TestFunction"
-    newFn: newFn
-    oldFn: oldFn
+  params = null
 
   beforeEach ->
-    params.onNewFnError = sinon.spy()
-    params.onDiffs = sinon.spy()
+    params =
+      name: "TestFunction"
+      newFn: newFn
+      oldFn: oldFn
+      onNewFnError: sinon.spy()
+      onDiffs: sinon.spy()
 
   it "works correctly with functions that return different data", (done) ->
     twinning(params) (err, result) ->
@@ -71,21 +73,84 @@ describe "twinning async functions", ->
       expect(params.onDiffs.calledOnce).to.be(false)
       done()
 
+  describe "when onDiffs throws", ->
+
+    # some setup here to prevent mocha from catching out-of-scope exceptions
+    # for this describe block
+    mochaErrorListener = null
+    stubListener = sinon.spy()
+
+    before ->
+      mochaErrorListener = process.listeners('uncaughtException')[0]
+      process.removeListener "uncaughtException", mochaErrorListener
+      process.addListener "uncaughtException", stubListener
+
+    after ->
+
+    it "still returns result", (done) ->
+      params.onDiffs = sinon.stub().throws new Error "stub error"
+      twinning(params) (err, result) ->
+        process.removeListener "uncaughtException", stubListener
+        process.addListener "uncaughtException", mochaErrorListener
+
+        expect(err).to.not.be.ok()
+        expect(result).to.eql(oldResult)
+        expect(params.onNewFnError.calledOnce).to.be(false)
+        expect(params.onDiffs.calledOnce).to.be(true)
+        expect(stubListener.calledOnce).to.be(true)
+        done()
+
+  describe "error handling", ->
+
+    it "returns error if oldFn errors", (done) ->
+      params.newFn = badNewFn
+      params.oldFn = badNewFn
+      twinning(params) (err, result) ->
+        expect(err.message).to.match(/Pigs can't fly/)
+        done()
+
+    it "doesn't call onNewFnError if both old and new error", (done) ->
+      params.newFn = badNewFn
+      params.oldFn = (cb) -> cb new Error()
+      twinning(params) (err, result) ->
+        expect(err.message).to.be('')
+        expect(params.onNewFnError.calledOnce).to.be(false)
+        done()
+
+    it "doesn't call onDiffs if old and new error with same message", (done) ->
+      params.newFn = badNewFn
+      params.oldFn = badNewFn
+      twinning(params) (err, result) ->
+        expect(err.message).to.match(/Pigs can't fly/)
+        expect(params.onNewFnError.calledOnce).to.be(false)
+        expect(params.onDiffs.calledOnce).to.be(false)
+        done()
+
+    it "calls onDiffs if old and new error with different message", (done) ->
+      params.newFn = (cb) -> cb new Error "Cats cannot wink with their ears"
+      params.oldFn = badNewFn
+      twinning(params) (err, result) ->
+        expect(err.message).to.match(/Pigs can't fly/)
+        expect(params.onNewFnError.calledOnce).to.be(false)
+        expect(params.onDiffs.calledOnce).to.be(true)
+        done()
+
 describe "twinning promise functions", ->
   oldFn = () -> Promise.resolve oldResult
   newFn = () -> Promise.resolve newResult
   badNewFn = () -> Promise.reject(new Error("Cats cannot land on their backs"))
   sameFn = () -> Promise.resolve oldResult
 
-  params =
-    name: "TestFunction"
-    newFn: newFn
-    oldFn: oldFn
-    promises: true
+  params = null
 
   beforeEach ->
-    params.onNewFnError = sinon.spy()
-    params.onDiffs = sinon.spy()
+    params =
+      name: "TestFunction"
+      newFn: newFn
+      oldFn: oldFn
+      promises: true
+      onNewFnError: sinon.spy()
+      onDiffs: sinon.spy()
 
   it "works correctly with functions that return different data", ->
     twinning(params)()
@@ -116,21 +181,79 @@ describe "twinning promise functions", ->
         expect(params.onNewFnError.calledOnce).to.be(false)
         expect(params.onDiffs.calledOnce).to.be(false)
 
+  describe "when onDiffs throws", ->
+
+    # some setup here to prevent mocha from catching out-of-scope exceptions
+    # for this describe block
+    mochaErrorListener = null
+    stubListener = sinon.spy()
+
+    before ->
+      mochaErrorListener = process.listeners('uncaughtException')[0]
+      process.removeListener "uncaughtException", mochaErrorListener
+      process.addListener "uncaughtException", stubListener
+
+    after ->
+      process.removeListener "uncaughtException", stubListener
+      process.addListener "uncaughtException", mochaErrorListener
+
+    it "still returns result", (done) ->
+      params.onDiffs = sinon.stub().throws new Error "stub error"
+      twinning(params)()
+        .then (result) ->
+          expect(result).to.eql(oldResult)
+          expect(params.onNewFnError.calledOnce).to.be(false)
+          expect(params.onDiffs.calledOnce).to.be(true)
+          expect(stubListener.calledOnce).to.be(true)
+          done()
+        .catch done
+
+  describe "error handling", ->
+
+    it "returns error if oldFn errors", ->
+      params.newFn = badNewFn
+      params.oldFn = badNewFn
+      promiseShouldReject twinning(params)(), /Cats cannot land on their backs/
+
+    it "doesn't call onNewFnError if both old and new error", ->
+      params.newFn = badNewFn
+      params.oldFn = () -> Promise.reject new Error()
+      promiseShouldReject twinning(params)(), /.*/
+        .then () ->
+          expect(params.onNewFnError.calledOnce).to.be(false)
+
+    it "doesn't call onDiffs if old and new error with same message", ->
+      params.newFn = badNewFn
+      params.oldFn = badNewFn
+      promiseShouldReject twinning(params)(), /Cats cannot land on their backs/
+        .then () ->
+          expect(params.onNewFnError.calledOnce).to.be(false)
+          expect(params.onDiffs.calledOnce).to.be(false)
+
+    it "calls onDiffs if old and new error with different message", ->
+      params.newFn = () -> Promise.reject new Error "Cats cannot wink with their ears"
+      params.oldFn = badNewFn
+      promiseShouldReject twinning(params)(), /Cats cannot land on their backs/
+        .then () ->
+          expect(params.onNewFnError.calledOnce).to.be(false)
+          expect(params.onDiffs.calledOnce).to.be(true)
+
 describe "twinning sync function", ->
   oldFn = () -> oldResult
   newFn = () -> newResult
   badNewFn = () -> throw new Error("Cats hate water")
   sameFn = () -> oldResult
 
-  params =
-    name: "TestFunction"
-    newFn: newFn
-    oldFn: oldFn
-    sync: true
+  params = null
 
   beforeEach ->
-    params.onNewFnError = sinon.spy()
-    params.onDiffs = sinon.spy()
+    params =
+      name: "TestFunction"
+      newFn: newFn
+      oldFn: oldFn
+      sync: true
+      onNewFnError: sinon.spy()
+      onDiffs: sinon.spy()
 
   it "works correctly with functions that return different data", ->
     result = twinning(params)()
@@ -157,3 +280,13 @@ describe "twinning sync function", ->
     expect(result).to.eql(oldResult)
     expect(params.onNewFnError.calledOnce).to.be(false)
     expect(params.onDiffs.calledOnce).to.be(false)
+
+promiseShouldReject = (promise, test) ->
+  promise
+    .then(
+      (() -> throw new Error("Promise should have rejected!")),
+      ((err) ->
+        if test and !test.test(err.message)
+          throw new Error("Error was thrown but didn't match regex: " + test.toString() + "\nactual: " + err.message)
+      )
+    )

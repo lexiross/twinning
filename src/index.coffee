@@ -1,94 +1,109 @@
 diff = require("deep-diff").diff
-twinning = ({name, newFn, oldFn, onNewFnError, onDiffs, sync, promises}) -> (args...) ->
-  oldResult = null
-  newResult = null
 
-  oldFinished = false
-  newFinished = false
-  newErrored = false
+twinning = ({name, newFn, oldFn, onError, onDiffs, sync, promises}) ->
 
-  findAndHandleDiffs = () ->
+  findAndHandleDiffs = (oldResult, newResult) ->
     differences = diff oldResult, newResult
+
     if differences? and onDiffs?
       onDiffs name, differences
 
-  async = not sync and not promises
-
-  if async
-    [args..., cb] = args
-    oldPartial = (next) -> oldFn args..., next
-    newPartial = (next) -> newFn args..., next
-    onFinish = () ->
-      findAndHandleDiffs()
-      return cb null, oldResult
-
-    oldPartial (err, result) ->
-      if err?
-        return cb err
-      oldFinished = true
-      oldResult = result
-      if newFinished
-        onFinish()
-      else if newErrored
-        return cb null, result
-
-    newPartial (err, result) ->
-      if err?
-        if onNewFnError?
-          onNewFnError name, err
-        newErrored = true
-        if oldFinished
-          return cb null, oldResult
-      else
-        newFinished = true
-        newResult = result
-        if oldFinished
-          onFinish()
-
-  else if promises
+  handleAsync = (oldPromise, newPromise) ->
+    oldErrored = false
+    newErrored = false
     return new Promise (resolve, reject) ->
-      oldFn args...
-        .then (result) ->
-          oldFinished = true
-          oldResult = result
-          if newFinished
-            # run diff in next tick so exceptions don't get caught
-            process.nextTick ->
-              findAndHandleDiffs()
-              resolve(oldResult)
-          else if newErrored
-            resolve(oldResult)
+      runningOld = oldPromise
         .catch (err) ->
-          reject(err)
-      newFn args...
-        .then (result) ->
-          newFinished = true
-          newResult = result
-          if oldFinished
-            # run diff in next tick so exceptions don't get caught
-            process.nextTick ->
-              findAndHandleDiffs()
-              resolve(oldResult)
-        .catch (err) ->
-          if onNewFnError?
-            onNewFnError name, err
-          newErrored = true
-          if oldFinished
-            resolve(oldResult)
+          oldErrored = true
+          return err
 
-  else if sync
-    oldResult = oldFn args...
+      runningNew = newPromise
+        .catch (err) ->
+          newErrored = true
+          return err
+
+      Promise.all [runningOld, runningNew]
+        .then ([oldResult, newResult]) ->
+          # only call onError if only newFn errored
+          if newErrored or oldErrored
+            if onError
+              # nextTick so exceptions don't get caught by containing promise
+              process.nextTick ->
+                onError name, {
+                  oldErr: if oldErrored then oldResult else undefined
+                  newErr: if newErrored then newResult else undefined
+                }
+          else
+            # nextTick so exceptions don't get caught by containing promise
+            process.nextTick ->
+              findAndHandleDiffs(oldResult, newResult)
+
+          # nextTick resolving so onError/findAndHandleDiffs get to run first
+          process.nextTick ->
+            if oldErrored
+              reject oldResult
+            else
+              resolve oldResult
+
+  handleSync = (args) ->
+    oldErrored = false
+    newErrored = false
+
+    try
+      oldResult = oldFn args...
+    catch err
+      oldErrored = true
+      oldResult = err
+
     try
       newResult = newFn args...
     catch err
-      if onNewFnError?
-        onNewFnError name, err
+      newErrored = true
+      newResult = err
+
+    if newErrored or oldErrored
+      if onError?
+        onError name, {
+          oldErr: if oldErrored then oldResult else undefined
+          newErr: if newErrored then newResult else undefined
+        }
+    else
+      findAndHandleDiffs(oldResult, newResult)
+
+    if oldErrored
+      throw oldResult
+    else
       return oldResult
-    findAndHandleDiffs()
-    return oldResult
+
+  return (args...) ->
+    usingCb = not sync and not promises
+
+    if usingCb
+      [args..., cb] = args
+
+      oldPromise = fromCallback (next) -> oldFn args..., next
+      newPromise = fromCallback (next) -> newFn args..., next
+
+      runningTasks = handleAsync oldPromise, newPromise
+
+      asCallback runningTasks, cb
+    else if promises
+      return handleAsync (oldFn args...), (newFn args...)
+    else if sync
+      return handleSync(args)
 
 module.exports = twinning
 module.exports.defaults = (defaults) -> (params) ->
   for k, v of defaults
     params[k] ?= v
   return twinning params
+
+fromCallback = (fn) ->
+  return new Promise (resolve, reject) ->
+    fn (err, result) ->
+      if err?
+        return reject err
+      resolve result
+
+asCallback = (promise, cb) ->
+  promise.then cb.bind(null, null), cb

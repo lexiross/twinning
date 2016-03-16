@@ -36,7 +36,7 @@ describe "twinning async functions", ->
       name: "TestFunction"
       newFn: newFn
       oldFn: oldFn
-      onNewFnError: sinon.spy()
+      onError: sinon.spy()
       onDiffs: sinon.spy()
 
   it "works correctly with functions that return different data", (done) ->
@@ -48,7 +48,7 @@ describe "twinning async functions", ->
       diffs = params.onDiffs.args[0][1]
       expect(name).to.be(params.name)
       expect(diffs).to.eql diffs
-      expect(params.onNewFnError.calledOnce).to.be(false)
+      expect(params.onError.called).to.be(false)
       done()
 
   it "works correctly with a new function that errors", (done) ->
@@ -57,11 +57,12 @@ describe "twinning async functions", ->
       expect(err).to.not.be.ok()
       expect(result).to.eql(oldResult)
 
-      name = params.onNewFnError.args[0][0]
-      err = params.onNewFnError.args[0][1]
+      expect(params.onError.calledOnce).to.be(true)
+      [name, {oldErr, newErr}] = params.onError.getCall(0).args
       expect(name).to.be(params.name)
-      expect(err.message).to.be("Pigs can't fly!")
-      expect(params.onDiffs.calledOnce).to.be(false)
+      expect(oldErr).to.be(undefined)
+      expect(newErr.message).to.be("Pigs can't fly!")
+      expect(params.onDiffs.called).to.be(false)
 
       done()
 
@@ -69,8 +70,8 @@ describe "twinning async functions", ->
     params.newFn = sameFn
     twinning(params) (err, result) ->
       expect(result).to.eql(oldResult)
-      expect(params.onNewFnError.calledOnce).to.be(false)
-      expect(params.onDiffs.calledOnce).to.be(false)
+      expect(params.onError.called).to.be(false)
+      expect(params.onDiffs.called).to.be(false)
       done()
 
   describe "when onDiffs throws", ->
@@ -95,44 +96,9 @@ describe "twinning async functions", ->
 
         expect(err).to.not.be.ok()
         expect(result).to.eql(oldResult)
-        expect(params.onNewFnError.calledOnce).to.be(false)
+        expect(params.onError.called).to.be(false)
         expect(params.onDiffs.calledOnce).to.be(true)
         expect(stubListener.calledOnce).to.be(true)
-        done()
-
-  describe "error handling", ->
-
-    it "returns error if oldFn errors", (done) ->
-      params.newFn = badNewFn
-      params.oldFn = badNewFn
-      twinning(params) (err, result) ->
-        expect(err.message).to.match(/Pigs can't fly/)
-        done()
-
-    it "doesn't call onNewFnError if both old and new error", (done) ->
-      params.newFn = badNewFn
-      params.oldFn = (cb) -> cb new Error()
-      twinning(params) (err, result) ->
-        expect(err.message).to.be('')
-        expect(params.onNewFnError.calledOnce).to.be(false)
-        done()
-
-    it "doesn't call onDiffs if old and new error with same message", (done) ->
-      params.newFn = badNewFn
-      params.oldFn = badNewFn
-      twinning(params) (err, result) ->
-        expect(err.message).to.match(/Pigs can't fly/)
-        expect(params.onNewFnError.calledOnce).to.be(false)
-        expect(params.onDiffs.calledOnce).to.be(false)
-        done()
-
-    it "calls onDiffs if old and new error with different message", (done) ->
-      params.newFn = (cb) -> cb new Error "Cats cannot wink with their ears"
-      params.oldFn = badNewFn
-      twinning(params) (err, result) ->
-        expect(err.message).to.match(/Pigs can't fly/)
-        expect(params.onNewFnError.calledOnce).to.be(false)
-        expect(params.onDiffs.calledOnce).to.be(true)
         done()
 
 describe "twinning promise functions", ->
@@ -149,37 +115,38 @@ describe "twinning promise functions", ->
       newFn: newFn
       oldFn: oldFn
       promises: true
-      onNewFnError: sinon.spy()
+      onError: sinon.spy()
       onDiffs: sinon.spy()
 
   it "works correctly with functions that return different data", ->
     twinning(params)()
       .then (result) ->
         expect(result).to.eql(oldResult)
-        name = params.onDiffs.args[0][0]
-        diffs = params.onDiffs.args[0][1]
+        expect(params.onDiffs.calledOnce).to.be(true)
+        [name, diffs] = params.onDiffs.getCall(0).args
         expect(name).to.be(params.name)
         expect(diffs).to.eql diffs
-        expect(params.onNewFnError.calledOnce).to.be(false)
+        expect(params.onError.called).to.be(false)
 
   it "works correctly with a function that errors", ->
     params.newFn = badNewFn
     twinning(params)()
       .then (result) ->
         expect(result).to.eql(oldResult)
-        name = params.onNewFnError.args[0][0]
-        err = params.onNewFnError.args[0][1]
+        expect(params.onError.calledOnce).to.be(true)
+        [name, {oldErr, newErr}] = params.onError.getCall(0).args
         expect(name).to.be(params.name)
-        expect(err.message).to.be("Cats cannot land on their backs")
-        expect(params.onDiffs.calledOnce).to.be(false)
+        expect(oldErr).to.be(undefined)
+        expect(newErr.message).to.be("Cats cannot land on their backs")
+        expect(params.onDiffs.called).to.be(false)
 
   it "works correctly with functions that return the same data", ->
     params.newFn = sameFn
     twinning(params)()
       .then (result) ->
         expect(result).to.eql(oldResult)
-        expect(params.onNewFnError.calledOnce).to.be(false)
-        expect(params.onDiffs.calledOnce).to.be(false)
+        expect(params.onError.called).to.be(false)
+        expect(params.onDiffs.called).to.be(false)
 
   describe "when onDiffs throws", ->
 
@@ -202,41 +169,11 @@ describe "twinning promise functions", ->
       twinning(params)()
         .then (result) ->
           expect(result).to.eql(oldResult)
-          expect(params.onNewFnError.calledOnce).to.be(false)
+          expect(params.onError.called).to.be(false)
           expect(params.onDiffs.calledOnce).to.be(true)
           expect(stubListener.calledOnce).to.be(true)
           done()
         .catch done
-
-  describe "error handling", ->
-
-    it "returns error if oldFn errors", ->
-      params.newFn = badNewFn
-      params.oldFn = badNewFn
-      promiseShouldReject twinning(params)(), /Cats cannot land on their backs/
-
-    it "doesn't call onNewFnError if both old and new error", ->
-      params.newFn = badNewFn
-      params.oldFn = () -> Promise.reject new Error()
-      promiseShouldReject twinning(params)(), /.*/
-        .then () ->
-          expect(params.onNewFnError.calledOnce).to.be(false)
-
-    it "doesn't call onDiffs if old and new error with same message", ->
-      params.newFn = badNewFn
-      params.oldFn = badNewFn
-      promiseShouldReject twinning(params)(), /Cats cannot land on their backs/
-        .then () ->
-          expect(params.onNewFnError.calledOnce).to.be(false)
-          expect(params.onDiffs.calledOnce).to.be(false)
-
-    it "calls onDiffs if old and new error with different message", ->
-      params.newFn = () -> Promise.reject new Error "Cats cannot wink with their ears"
-      params.oldFn = badNewFn
-      promiseShouldReject twinning(params)(), /Cats cannot land on their backs/
-        .then () ->
-          expect(params.onNewFnError.calledOnce).to.be(false)
-          expect(params.onDiffs.calledOnce).to.be(true)
 
 describe "twinning sync function", ->
   oldFn = () -> oldResult
@@ -252,7 +189,7 @@ describe "twinning sync function", ->
       newFn: newFn
       oldFn: oldFn
       sync: true
-      onNewFnError: sinon.spy()
+      onError: sinon.spy()
       onDiffs: sinon.spy()
 
   it "works correctly with functions that return different data", ->
@@ -262,31 +199,22 @@ describe "twinning sync function", ->
     diffs = params.onDiffs.args[0][1]
     expect(name).to.be(params.name)
     expect(diffs).to.eql diffs
-    expect(params.onNewFnError.calledOnce).to.be(false)
+    expect(params.onError.called).to.be(false)
 
   it "works correctly with a function that errors", ->
     params.newFn = badNewFn
     result = twinning(params)()
     expect(result).to.eql(oldResult)
-    name = params.onNewFnError.args[0][0]
-    err = params.onNewFnError.args[0][1]
+    expect(params.onError.calledOnce).to.be(true)
+    [name, {oldErr, newErr}] = params.onError.getCall(0).args
     expect(name).to.be(params.name)
-    expect(err.message).to.be("Cats hate water")
-    expect(params.onDiffs.calledOnce).to.be(false)
+    expect(oldErr).to.be(undefined)
+    expect(newErr.message).to.be("Cats hate water")
+    expect(params.onDiffs.called).to.be(false)
 
   it "works correctly with functions that return the same data", ->
     params.newFn = sameFn
     result = twinning(params)()
     expect(result).to.eql(oldResult)
-    expect(params.onNewFnError.calledOnce).to.be(false)
-    expect(params.onDiffs.calledOnce).to.be(false)
-
-promiseShouldReject = (promise, test) ->
-  promise
-    .then(
-      (() -> throw new Error("Promise should have rejected!")),
-      ((err) ->
-        if test and !test.test(err.message)
-          throw new Error("Error was thrown but didn't match regex: " + test.toString() + "\nactual: " + err.message)
-      )
-    )
+    expect(params.onError.called).to.be(false)
+    expect(params.onDiffs.called).to.be(false)

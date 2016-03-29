@@ -1,12 +1,15 @@
 diff = require("deep-diff").diff
 
-twinning = ({name, newFn, oldFn, onError, onDiffs, sync, promises}) ->
+twinning = ({name, newFn, oldFn, onError, onDiffs, ignore, sync, promises}) ->
 
   findAndHandleDiffs = (oldResult, newResult) ->
-    differences = diff oldResult, newResult
+    diffs = diff oldResult, newResult
 
-    if differences? and onDiffs?
-      onDiffs name, differences
+    if ignore?
+      diffs = diffs.filter (diff) -> not ignore(diff)
+
+    if diffs? and onDiffs?
+      onDiffs name, diffs
 
   handleAsync = (oldPromise, newPromise) ->
     oldErrored = false
@@ -29,10 +32,9 @@ twinning = ({name, newFn, oldFn, onError, onDiffs, sync, promises}) ->
             if onError
               # nextTick so exceptions don't get caught by containing promise
               process.nextTick ->
-                onError name, {
+                onError name,
                   oldErr: if oldErrored then oldResult else undefined
                   newErr: if newErrored then newResult else undefined
-                }
           else
             # nextTick so exceptions don't get caught by containing promise
             process.nextTick ->

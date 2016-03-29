@@ -8,7 +8,7 @@ twinning = ({name, newFn, oldFn, onError, onDiffs, ignore, sync, promises}) ->
     if ignore?
       diffs = diffs.filter (diff) -> not ignore(diff)
 
-    if diffs? and onDiffs?
+    if diffs?.length > 0 and onDiffs?
       onDiffs name, diffs
 
   handleAsync = (oldPromise, newPromise) ->

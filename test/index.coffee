@@ -74,18 +74,6 @@ describe "twinning async functions", ->
       expect(params.onDiffs.called).to.be(false)
       done()
 
-
-  it "ignore functionalty ignores diffs that pass the test", (done) ->
-    params.ignore = (diff) -> diff.lhs is 1
-    result = twinning(params) (err, result) ->
-      expect(result).to.eql(oldResult)
-      name = params.onDiffs.args[0][0]
-      diffs = params.onDiffs.args[0][1]
-      expect(name).to.be(params.name)
-      expect(diffs).to.eql expectedDiffs.slice(1)
-      expect(params.onError.called).to.be(false)
-      done()
-
   describe "when onDiffs throws", ->
 
     # some setup here to prevent mocha from catching out-of-scope exceptions
@@ -160,17 +148,6 @@ describe "twinning promise functions", ->
         expect(params.onError.called).to.be(false)
         expect(params.onDiffs.called).to.be(false)
 
-  it "ignore functionalty ignores diffs that pass the test", ->
-    params.ignore = (diff) -> diff.lhs is 1
-    twinning(params)()
-      .then (result) ->
-        expect(result).to.eql(oldResult)
-        name = params.onDiffs.args[0][0]
-        diffs = params.onDiffs.args[0][1]
-        expect(name).to.be(params.name)
-        expect(diffs).to.eql expectedDiffs.slice(1)
-        expect(params.onError.called).to.be(false)
-
   describe "when onDiffs throws", ->
 
     # some setup here to prevent mocha from catching out-of-scope exceptions
@@ -242,12 +219,39 @@ describe "twinning sync function", ->
     expect(params.onError.called).to.be(false)
     expect(params.onDiffs.called).to.be(false)
 
-  it "ignore functionalty ignores diffs that pass the test", ->
-    params.ignore = (diff) -> diff.lhs is 1
-    result = twinning(params)()
-    expect(result).to.eql(oldResult)
-    name = params.onDiffs.args[0][0]
+
+describe "ignore functionality", ->
+
+  # let's use the sync version
+  oldFn = () -> oldResult
+  newFn = () -> newResult
+  badNewFn = () -> throw new Error("Cats hate water")
+  sameFn = () -> oldResult
+
+  params = null
+
+  beforeEach ->
+    params =
+      name: "TestFunction"
+      newFn: newFn
+      oldFn: oldFn
+      sync: true
+      onError: sinon.spy()
+      onDiffs: sinon.spy()
+
+  it "passes through all diffs if none pass the test", ->
+    params.ignore = -> false
+    twinning(params)()
     diffs = params.onDiffs.args[0][1]
-    expect(name).to.be(params.name)
+    expect(diffs).to.eql expectedDiffs
+
+  it "ignores diffs that pass the test", ->
+    params.ignore = (diff) -> diff.lhs is 1
+    twinning(params)()
+    diffs = params.onDiffs.args[0][1]
     expect(diffs).to.eql expectedDiffs.slice(1)
-    expect(params.onError.called).to.be(false)
+
+  it "does not call onDiffs if all diffs are ignored", ->
+    params.ignore = -> true
+    result = twinning(params)()
+    expect(params.onDiffs.called).to.be(false)

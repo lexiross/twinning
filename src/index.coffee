@@ -2,80 +2,56 @@ diff = require("deep-diff").diff
 
 twinning = ({name, newFn, oldFn, onError, onDiffs, ignore, sync, promises}) ->
 
-  findAndHandleDiffs = (oldResult, newResult) ->
-    diffs = diff oldResult, newResult
+  onResult = (oldErr, newErr, oldResult, newResult) ->
+    if newErr or oldErr
+      if onError?
+        onError name, oldErr, newErr
+    else
+      diffs = diff oldResult, newResult
 
-    if ignore?
-      diffs = diffs.filter (diff) -> not ignore(diff)
+      if ignore?
+        diffs = diffs.filter (diff) -> not ignore(diff)
 
-    if diffs?.length > 0 and onDiffs?
-      onDiffs name, diffs
+      if diffs?.length > 0 and onDiffs?
+        onDiffs name, diffs
+
+    # either of the above may have thrown.
+    if oldErr
+      throw oldErr
+    return oldResult
 
   handleAsync = (oldPromise, newPromise) ->
-    oldErrored = false
-    newErrored = false
-    return new Promise (resolve, reject) ->
-      runningOld = oldPromise
-        .catch (err) ->
-          oldErrored = true
-          return err
+    oldErr = null
+    newErr = null
 
-      runningNew = newPromise
-        .catch (err) ->
-          newErrored = true
-          return err
+    runningOld = oldPromise
+      .catch (err) ->
+        oldErr = err
+        return null
 
-      Promise.all [runningOld, runningNew]
-        .then ([oldResult, newResult]) ->
-          # only call onError if only newFn errored
-          if newErrored or oldErrored
-            if onError
-              # nextTick so exceptions don't get caught by containing promise
-              process.nextTick ->
-                onError name,
-                  oldErr: if oldErrored then oldResult else undefined
-                  newErr: if newErrored then newResult else undefined
-          else
-            # nextTick so exceptions don't get caught by containing promise
-            process.nextTick ->
-              findAndHandleDiffs(oldResult, newResult)
+    runningNew = newPromise
+      .catch (err) ->
+        newErr = err
+        return null
 
-          # nextTick resolving so onError/findAndHandleDiffs get to run first
-          process.nextTick ->
-            if oldErrored
-              reject oldResult
-            else
-              resolve oldResult
+    Promise.all [runningOld, runningNew]
+      .then ([oldResult, newResult]) -> onResult oldErr, newErr, oldResult, newResult
 
   handleSync = (args) ->
-    oldErrored = false
-    newErrored = false
+    oldErr = null
+    newErr = null
 
     try
       oldResult = oldFn args...
     catch err
-      oldErrored = true
-      oldResult = err
+      oldErr = err
 
     try
       newResult = newFn args...
     catch err
-      newErrored = true
-      newResult = err
+      newErr = err
 
-    if newErrored or oldErrored
-      if onError?
-        onError name, {
-          oldErr: if oldErrored then oldResult else undefined
-          newErr: if newErrored then newResult else undefined
-        }
-    else
-      findAndHandleDiffs(oldResult, newResult)
-
-    if oldErrored
-      throw oldResult
-    else
-      return oldResult
+    return onResult oldErr, newErr, oldResult, newResult
 
   return (args...) ->
     usingCb = not sync and not promises
@@ -85,10 +61,7 @@ twinning = ({name, newFn, oldFn, onError, onDiffs, ignore, sync, promises}) ->
 
       oldPromise = fromCallback (next) -> oldFn args..., next
       newPromise = fromCallback (next) -> newFn args..., next
-
-      runningTasks = handleAsync oldPromise, newPromise
-
-      asCallback runningTasks, cb
+      asCallback handleAsync(oldPromise, newPromise), cb
     else if promises
       return handleAsync (oldFn args...), (newFn args...)
     else if sync

@@ -89,7 +89,7 @@ describe "when new and old functions return different data", ->
       sinon.assert.calledWith(params.onDiffs, params.name, diffs)
       sinon.assert.notCalled(params.onError)
 
-  describe "if `onDiffs` throws", ->
+  describe "when `onDiffs` throws", ->
 
     multi "throws error from `onDiffs`", (run) ->
       params =
@@ -105,9 +105,9 @@ describe "when new and old functions return different data", ->
         sinon.assert.calledWith(params.onDiffs, params.name, diffs)
         sinon.assert.notCalled(params.onError)
 
-  describe "if `ignore` option is set", ->
+  describe "when `ignore` option is set", ->
 
-    describe "if no diffs match predicate", ->
+    describe "when no diffs match predicate", ->
 
       multi "calls `onDiffs` with all diffs", (run) ->
         params =
@@ -124,7 +124,7 @@ describe "when new and old functions return different data", ->
           sinon.assert.calledWith(params.onDiffs, params.name, diffs)
           sinon.assert.notCalled(params.onError)
 
-    describe "if some diffs match predicate", ->
+    describe "when some diffs match predicate", ->
 
       multi "calls `onDiffs` with diffs that don't match", (run) ->
         params =
@@ -141,7 +141,7 @@ describe "when new and old functions return different data", ->
           sinon.assert.calledWithMatch(params.onDiffs, params.name, diffs.slice(1))
           sinon.assert.notCalled(params.onError)
 
-    describe "if all diffs match predicate", ->
+    describe "when all diffs match predicate", ->
 
       multi "does not call `onDiffs`", (run) ->
         params = 

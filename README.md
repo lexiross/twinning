@@ -7,7 +7,7 @@ const findCatsById = twinning({
   oldFn: OldDatabase.findCatsById,
   newFn: NewDatabase.findCatsById,
   onDiff: onDiffs,
-  onError: errorHandlingFunction
+  onError: onError
 });
 
 findCatsById("1234", function(err, result) {

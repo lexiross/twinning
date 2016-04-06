@@ -11,247 +11,246 @@ newResult =
   a: 4
   b: 2
   c: [1, 5]
-expectedDiffs = [
+diffs = [
   { kind: 'E', path: [ 'a' ], lhs: 1, rhs: 4 },
   { kind: 'E', path: [ 'c', 1 ], lhs: 3, rhs: 5 }
 ]
+oldError = new Error("Old error")
+newError = new Error("New error")
+evaluationError = new Error("Evalutation error")
 
-describe "twinning async functions", ->
-  oldFn = (cb) ->
-    setTimeout (() -> cb(null, oldResult)), 0
 
-  newFn = (cb) ->
-    setTimeout (() -> cb(null, newResult)), 0
-
-  badNewFn = (cb) ->
-    setTimeout (() -> cb(new Error("Pigs can't fly!"))), 0
-
-  sameFn = (cb) ->
-    setTimeout (() -> cb(null, oldResult)), 0
-
-  params = null
-
-  beforeEach ->
-    params =
-      name: "TestFunction"
-      newFn: newFn
-      oldFn: oldFn
-      onError: sinon.spy()
-      onDiffs: sinon.spy()
-
-  it "works correctly with functions that return different data", (done) ->
-    twinning(params) (err, result) ->
-      expect(err).to.not.be.ok()
-      expect(result).to.eql(oldResult)
-
-      name = params.onDiffs.args[0][0]
-      diffs = params.onDiffs.args[0][1]
-      expect(name).to.be(params.name)
-      expect(diffs).to.eql expectedDiffs
-      expect(params.onError.called).to.be(false)
-      done()
-
-  it "works correctly with a new function that errors", (done) ->
-    params.newFn = badNewFn
-    twinning(params) (err, result) ->
-      expect(err).to.not.be.ok()
-      expect(result).to.eql(oldResult)
-
-      expect(params.onError.calledOnce).to.be(true)
-      [name, {oldErr, newErr}] = params.onError.getCall(0).args
-      expect(name).to.be(params.name)
-      expect(oldErr).to.be(undefined)
-      expect(newErr.message).to.be("Pigs can't fly!")
-      expect(params.onDiffs.called).to.be(false)
-
-      done()
-
-  it "works correctly with functions that return the same data", (done) ->
-    params.newFn = sameFn
-    twinning(params) (err, result) ->
-      expect(result).to.eql(oldResult)
-      expect(params.onError.called).to.be(false)
-      expect(params.onDiffs.called).to.be(false)
-      done()
-
-  describe "when onDiffs throws", ->
-
-    # some setup here to prevent mocha from catching out-of-scope exceptions
-    # for this describe block
-    mochaErrorListener = null
-    stubListener = sinon.spy()
-
-    before ->
-      mochaErrorListener = process.listeners('uncaughtException')[0]
-      process.removeListener "uncaughtException", mochaErrorListener
-      process.addListener "uncaughtException", stubListener
-
-    after ->
-
-    it "still returns result", (done) ->
-      params.onDiffs = sinon.stub().throws new Error "stub error"
+# Instead of oldFn and newFn, pass in `oldResult`, `oldError`, `newResult`, and `newError`.
+# `multi` will convert your params into three different sets of params, one for 
+# callbacks, one for promises, and one for synchronous functions, and call your evalutation
+# callback with the appropriate values for each.
+multi = (description, runner) ->
+  
+  it "#{description} (callbacks)", (done) ->
+    runner (params, evaluate) ->
+      params.oldFn = (cb) -> cb params.oldError, params.oldResult
+      params.newFn = (cb) -> cb params.newError, params.newResult
       twinning(params) (err, result) ->
-        process.removeListener "uncaughtException", stubListener
-        process.addListener "uncaughtException", mochaErrorListener
-
-        expect(err).to.not.be.ok()
-        expect(result).to.eql(oldResult)
-        expect(params.onError.called).to.be(false)
-        expect(params.onDiffs.calledOnce).to.be(true)
-        expect(stubListener.calledOnce).to.be(true)
+        try 
+          evaluate(err, result)
+        catch err
+          return done(err)
         done()
-
-describe "twinning promise functions", ->
-  oldFn = () -> Promise.resolve oldResult
-  newFn = () -> Promise.resolve newResult
-  badNewFn = () -> Promise.reject(new Error("Cats cannot land on their backs"))
-  sameFn = () -> Promise.resolve oldResult
-
-  params = null
-
-  beforeEach ->
-    params =
-      name: "TestFunction"
-      newFn: newFn
-      oldFn: oldFn
-      promises: true
-      onError: sinon.spy()
-      onDiffs: sinon.spy()
-
-  it "works correctly with functions that return different data", ->
-    twinning(params)()
-      .then (result) ->
-        expect(result).to.eql(oldResult)
-        expect(params.onDiffs.calledOnce).to.be(true)
-        [name, diffs] = params.onDiffs.getCall(0).args
-        expect(name).to.be(params.name)
-        expect(diffs).to.eql expectedDiffs
-        expect(params.onError.called).to.be(false)
-
-  it "works correctly with a function that errors", ->
-    params.newFn = badNewFn
-    twinning(params)()
-      .then (result) ->
-        expect(result).to.eql(oldResult)
-        expect(params.onError.calledOnce).to.be(true)
-        [name, {oldErr, newErr}] = params.onError.getCall(0).args
-        expect(name).to.be(params.name)
-        expect(oldErr).to.be(undefined)
-        expect(newErr.message).to.be("Cats cannot land on their backs")
-        expect(params.onDiffs.called).to.be(false)
-
-  it "works correctly with functions that return the same data", ->
-    params.newFn = sameFn
-    twinning(params)()
-      .then (result) ->
-        expect(result).to.eql(oldResult)
-        expect(params.onError.called).to.be(false)
-        expect(params.onDiffs.called).to.be(false)
-
-  describe "when onDiffs throws", ->
-
-    # some setup here to prevent mocha from catching out-of-scope exceptions
-    # for this describe block
-    mochaErrorListener = null
-    stubListener = sinon.spy()
-
-    before ->
-      mochaErrorListener = process.listeners('uncaughtException')[0]
-      process.removeListener "uncaughtException", mochaErrorListener
-      process.addListener "uncaughtException", stubListener
-
-    after ->
-      process.removeListener "uncaughtException", stubListener
-      process.addListener "uncaughtException", mochaErrorListener
-
-    it "still returns result", (done) ->
-      params.onDiffs = sinon.stub().throws new Error "stub error"
+  
+  it "#{description} (promises)", ->
+    runner (params, evaluate) ->
+      params.oldFn = -> if params.oldError then Promise.reject(params.oldError) else Promise.resolve(params.oldResult)
+      params.newFn = -> if params.newError then Promise.reject(params.newError) else Promise.resolve(params.newResult)
+      params.promises = true
       twinning(params)()
-        .then (result) ->
-          expect(result).to.eql(oldResult)
-          expect(params.onError.called).to.be(false)
-          expect(params.onDiffs.calledOnce).to.be(true)
-          expect(stubListener.calledOnce).to.be(true)
-          done()
-        .catch done
+        .then evaluate.bind(null, null), evaluate
 
-describe "twinning sync function", ->
-  oldFn = () -> oldResult
-  newFn = () -> newResult
-  badNewFn = () -> throw new Error("Cats hate water")
-  sameFn = () -> oldResult
+  it "#{description} (sync)", ->
+    runner (params, evaluate) ->
+      params.oldFn = -> if params.oldError then throw params.oldError else params.oldResult
+      params.newFn = -> if params.newError then throw params.newError else params.newResult
+      params.sync = true
+      err = null
+      try
+        result = twinning(params)()
+      catch ex
+        err = ex
+      evaluate err, result
 
-  params = null
+describe "when new and old functions return the same data", ->
 
-  beforeEach ->
+  multi "returns old result, does not call `onDiffs` or `onError`", (run) ->
     params =
       name: "TestFunction"
-      newFn: newFn
-      oldFn: oldFn
-      sync: true
-      onError: sinon.spy()
-      onDiffs: sinon.spy()
+      oldResult: oldResult
+      newResult: oldResult
+      onError: sinon.stub()
+      onDiffs: sinon.stub()
+    run params, (err, result) ->
+      expect(err).to.be(null)
+      expect(result).to.be(oldResult)
 
-  it "works correctly with functions that return different data", ->
-    result = twinning(params)()
-    expect(result).to.eql(oldResult)
-    name = params.onDiffs.args[0][0]
-    diffs = params.onDiffs.args[0][1]
-    expect(name).to.be(params.name)
-    expect(diffs).to.eql expectedDiffs
-    expect(params.onError.called).to.be(false)
+      sinon.assert.notCalled(params.onError)
+      sinon.assert.notCalled(params.onDiffs)
 
-  it "works correctly with a function that errors", ->
-    params.newFn = badNewFn
-    result = twinning(params)()
-    expect(result).to.eql(oldResult)
-    expect(params.onError.calledOnce).to.be(true)
-    [name, {oldErr, newErr}] = params.onError.getCall(0).args
-    expect(name).to.be(params.name)
-    expect(oldErr).to.be(undefined)
-    expect(newErr.message).to.be("Cats hate water")
-    expect(params.onDiffs.called).to.be(false)
+describe "when new and old functions return different data", ->
 
-  it "works correctly with functions that return the same data", ->
-    params.newFn = sameFn
-    result = twinning(params)()
-    expect(result).to.eql(oldResult)
-    expect(params.onError.called).to.be(false)
-    expect(params.onDiffs.called).to.be(false)
-
-
-describe "ignore functionality", ->
-
-  # let's use the sync version
-  oldFn = () -> oldResult
-  newFn = () -> newResult
-  badNewFn = () -> throw new Error("Cats hate water")
-  sameFn = () -> oldResult
-
-  params = null
-
-  beforeEach ->
+  multi "returns old result, calls `onDiffs` with diffs", (run) ->
     params =
       name: "TestFunction"
-      newFn: newFn
-      oldFn: oldFn
-      sync: true
-      onError: sinon.spy()
-      onDiffs: sinon.spy()
+      oldResult: oldResult
+      newResult: newResult
+      onError: sinon.stub()
+      onDiffs: sinon.stub()
+    run params, (err, result) ->
+      expect(err).to.be(null)
+      expect(result).to.be(oldResult)
 
-  it "passes through all diffs if none pass the test", ->
-    params.ignore = -> false
-    twinning(params)()
-    diffs = params.onDiffs.args[0][1]
-    expect(diffs).to.eql expectedDiffs
+      sinon.assert.calledWith(params.onDiffs, params.name, diffs)
+      sinon.assert.notCalled(params.onError)
 
-  it "ignores diffs that pass the test", ->
-    params.ignore = (diff) -> diff.lhs is 1
-    twinning(params)()
-    diffs = params.onDiffs.args[0][1]
-    expect(diffs).to.eql expectedDiffs.slice(1)
+  describe "when `onDiffs` throws", ->
 
-  it "does not call onDiffs if all diffs are ignored", ->
-    params.ignore = -> true
-    result = twinning(params)()
-    expect(params.onDiffs.called).to.be(false)
+    multi "throws error from `onDiffs`", (run) ->
+      params =
+        name: "TestFunction"
+        oldResult: oldResult
+        newResult: newResult
+        onError: sinon.stub()
+        onDiffs: sinon.stub().throws(oldError)
+      run params, (err, result) ->
+        expect(err).to.be(oldError)
+        expect(result).to.be(undefined)
+
+        sinon.assert.calledWith(params.onDiffs, params.name, diffs)
+        sinon.assert.notCalled(params.onError)
+
+  describe "when `ignore` option is set", ->
+
+    describe "when no diffs match predicate", ->
+
+      multi "calls `onDiffs` with all diffs", (run) ->
+        params =
+          name: "TestFunction"
+          oldResult: oldResult
+          newResult: newResult
+          onError: sinon.stub()
+          onDiffs: sinon.stub()
+          ignore: -> false
+        run params, (err, result) ->
+          expect(err).to.be(null)
+          expect(result).to.be(oldResult)
+
+          sinon.assert.calledWith(params.onDiffs, params.name, diffs)
+          sinon.assert.notCalled(params.onError)
+
+    describe "when some diffs match predicate", ->
+
+      multi "calls `onDiffs` with diffs that don't match", (run) ->
+        params =
+          name: "TestFunction"
+          oldResult: oldResult
+          newResult: newResult
+          onError: sinon.stub()
+          onDiffs: sinon.stub()
+          ignore: (diff) -> diff.lhs is 1
+        run params, (err, result) ->
+          expect(err).to.be(null)
+          expect(result).to.be(oldResult)
+
+          sinon.assert.calledWithMatch(params.onDiffs, params.name, diffs.slice(1))
+          sinon.assert.notCalled(params.onError)
+
+    describe "when all diffs match predicate", ->
+
+      multi "does not call `onDiffs`", (run) ->
+        params = 
+          name: "TestFunction"
+          oldResult: oldResult
+          newResult: newResult
+          onError: sinon.stub()
+          onDiffs: sinon.stub()
+          ignore: -> true
+        run params, (err, result) ->
+          expect(err).to.be(null)
+          expect(result).to.be(oldResult)
+
+          sinon.assert.notCalled(params.onDiffs)
+          sinon.assert.notCalled(params.onError)
+
+describe "when new function errors", ->
+
+  multi "returns old result and calls `onError`", (run) ->
+    params =
+      name: "TestFunction"
+      oldResult: oldResult
+      newError: newError
+      onError: sinon.stub()
+      onDiffs: sinon.stub()
+    run params, (err, result) ->
+      expect(err).to.be(null)
+      expect(result).to.be(oldResult)
+
+      sinon.assert.calledWithMatch(params.onError, params.name, null, newError)
+      sinon.assert.notCalled(params.onDiffs)
+
+  describe "when `onError` throws", ->
+
+    multi "throws error from `onError`", (run) ->
+      params =
+        name: "TestFunction"
+        oldResult: oldResult
+        newError: newError
+        onError: sinon.stub().throws(evaluationError)
+        onDiffs: sinon.stub()
+      run params, (err, result) ->
+        expect(err).to.be(evaluationError)
+        expect(result).to.be(undefined)
+
+        sinon.assert.calledWithMatch(params.onError, params.name, null, newError)
+        sinon.assert.notCalled(params.onDiffs)
+
+
+describe "when old function errors", ->
+
+  multi "throws old error and calls `onError`", (run) ->
+    params =
+      name: "TestFunction"
+      oldError: oldError
+      newResult: oldResult
+      onError: sinon.stub()
+      onDiffs: sinon.stub()
+    run params, (err, result) ->
+      expect(err).to.be(oldError)
+      expect(result).to.be(undefined)
+
+      sinon.assert.calledWithMatch(params.onError, params.name, oldError, null)
+      sinon.assert.notCalled(params.onDiffs)
+
+  describe "when `onError` throws", ->
+
+    multi "throws error from `onError`", (run) ->
+      params =
+        name: "TestFunction"
+        oldError: oldError
+        newResult: oldResult
+        onError: sinon.stub().throws(evaluationError)
+        onDiffs: sinon.stub()
+      run params, (err, result) ->
+        expect(err).to.be(evaluationError)
+        expect(result).to.be(undefined)
+
+        sinon.assert.calledWithMatch(params.onError, params.name, oldError, null)
+        sinon.assert.notCalled(params.onDiffs)
+
+describe "when old and new functions both error", ->
+
+  multi "throws old error and calls `onError`", (run) ->
+    params =
+      name: "TestFunction"
+      oldError: oldError
+      newError: newError
+      onError: sinon.stub()
+      onDiffs: sinon.stub()
+    run params, (err, result) ->
+      expect(err).to.be(oldError)
+      expect(result).to.be(undefined)
+
+      sinon.assert.calledWithMatch(params.onError, params.name, oldError, newError)
+      sinon.assert.notCalled(params.onDiffs)
+
+  describe "when `onError` throws", ->
+
+    multi "throws error from `onError`", (run) ->
+      params =
+        name: "TestFunction"
+        oldError: oldError
+        newError: newError
+        onError: sinon.stub().throws(evaluationError)
+        onDiffs: sinon.stub()
+      run params, (err, result) ->
+        expect(err).to.be(evaluationError)
+        expect(result).to.be(undefined)
+
+        sinon.assert.calledWithMatch(params.onError, params.name, oldError, newError)
+        sinon.assert.notCalled(params.onDiffs)

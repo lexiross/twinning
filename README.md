@@ -62,7 +62,7 @@ $ npm install twinning
 
 
 ### Configuring defaults:
-The `compare` method returns a function that is pre-configured with certain options. This function can then be used exactly like the base method.
+The `defaults` method returns a function that is pre-configured with certain options. This function can then be used exactly like the base method.
 ```js
 const twinning = require("twinning");
 const withDefaults = twinning.defaults({

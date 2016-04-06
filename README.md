@@ -61,7 +61,7 @@ $ npm install twinning
 - `sync`: Set this to `true` if youre `oldFn` and `newFn` are synchronous and do not use callbacks.
 
 
-### Configure defaults
+### Configuring defaults:
 The `compare` method returns a function that is pre-configured with certain options. This function can then be used exactly like the base method.
 ```js
 const twinning = require("twinning");

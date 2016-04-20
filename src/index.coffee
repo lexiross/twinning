@@ -5,22 +5,19 @@ twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, disabled, igno
   Promise = promiseLib or global.Promise
 
   onResult = (oldErr, newErr, oldResult, newResult) ->
-    if disabled
-      return oldResult
-    
-    if newErr or oldErr
-      if onError?
-        onError name, oldErr, newErr
-    else
-      diffs = diff oldResult, newResult
+    if not disabled
+      if newErr or oldErr
+        if onError?
+          onError name, oldErr, newErr
+      else
+        diffs = diff oldResult, newResult
 
-      if ignore?
-        diffs = diffs?.filter (diff) -> not ignore(diff)
+        if ignore?
+          diffs = diffs?.filter (diff) -> not ignore(diff)
 
-      if diffs?.length > 0 and onDiffs?
-        onDiffs name, diffs
+        if diffs?.length > 0 and onDiffs?
+          onDiffs name, diffs
 
-    # either of the above may have thrown.
     if oldErr
       throw oldErr
     return oldResult

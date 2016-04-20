@@ -1,31 +1,31 @@
 {
-  "author": "Lexi Ross",
-  "bugs": {
-    "url": "https://github.com/lexiross/twinning/issues"
-  },
+  "name": "twinning",
   "description": "compare results of two methods",
+  "version": "1.4.0",
+  "author": "Lexi Ross",
+  "main": "./lib",
   "homepage": "https://github.com/lexiross/twinning#readme",
   "license": "ISC",
-  "main": "./lib",
-  "name": "twinning",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/lexiross/twinning.git"
-  },
   "scripts": {
     "prepublish": "coffee -c -o ./lib ./src",
     "test": "mocha",
     "watch": "coffee -cw -o ./lib ./src"
   },
-  "version": "1.3.1",
+  "bugs": {
+    "url": "https://github.com/lexiross/twinning/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lexiross/twinning.git"
+  },
+  "dependencies": {
+    "deep-diff": "^0.3.3"
+  },
   "devDependencies": {
     "coffee-script": "1.9.3",
     "expect.js": "^0.3.1",
     "mocha": "2.2.5",
     "sinon": "^1.17.3"
-  },
-  "dependencies": {
-    "deep-diff": "^0.3.3"
   },
   "keywords": [
     "compare",

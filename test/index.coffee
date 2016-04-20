@@ -408,4 +408,23 @@ describe "when `after` is provided", ->
         expect(err).to.be(afterError)
         expect(result).to.be(undefined)
 
+describe "when `disabled` is set", ->
+
+  multi "does not run `newFn`", (run) ->
+    newFn = sinon.stub()
+    params =
+      name: "TestFunction"
+      disabled: true
+      before: (arg) -> arg + 1
+      oldFn: (arg) -> arg + 1
+      newFn: newFn
+      after: (arg) -> arg + 1
+
+    run params, [0], (err, result) ->
+      expect(err).to.be(null)
+      expect(result).to.be(3)
+
+      sinon.assert.notCalled(newFn)
+
+
 

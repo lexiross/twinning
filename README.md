@@ -57,6 +57,8 @@ $ npm install twinning
   - `name`: See above.
   - `oldError`: The error, if any, from `oldFn`.
   - `newError`: The error, if any, from `newFn`.
+- `before` *(optional)*: If provided, this function will be called with the any provided arguments. Its return value will then be used as the argument to `oldFn` and `newFn`. If `before` throws an error, `oldFn` and `newFn` will not be run.
+- `after` *(optional)*: If provided, this function will be called with the result of the comparison, and its return value will be returned instead. If an error occurs, `after` will not be called.
 - `promises` *(optional)*: Set this to `true` if your `oldFn` and `newFn` return a promise instead of using callbacks.
 - `sync` *(optional)*: Set this to `true` if youre `oldFn` and `newFn` are synchronous and do not use callbacks.
 

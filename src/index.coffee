@@ -27,69 +27,102 @@ twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, ignore, sync, 
       oldErr = null
       newErr = null
 
+      if not before?
+        fnInput = args
+      else
+        fnInput = [before args...]
+
       try
-        oldResult = oldFn args...
+        oldResult = oldFn fnInput...
       catch err
         oldErr = err
 
       try
-        newResult = newFn args...
+        newResult = newFn fnInput...
       catch err
         newErr = err
 
-      return onResult oldErr, newErr, oldResult, newResult
+      result = onResult oldErr, newErr, oldResult, newResult
+      
+      if after?
+        return after result
+      else
+        return result
   
   else if promises
     return (args...) ->
       oldErr = null
       newErr = null
 
-      runningOld = oldFn args...
-        .catch (err) ->
-          oldErr = err
-          return null
+      if not before?
+        getInput = Promise.resolve args
+      else
+        getInput = before args...
+          .then (results) -> [results]
 
-      runningNew = newFn args...
-        .catch (err) ->
-          newErr = err
-          return null
-
-      Promise.all [runningOld, runningNew]
-        .then ([oldResult, newResult]) -> onResult oldErr, newErr, oldResult, newResult
+      return getInput
+        .then (input) ->
+          runningOld = oldFn input...
+            .catch (err) ->
+              oldErr = err
+              return null
+          runningNew = newFn input...
+            .catch (err) ->
+              newErr = err
+              return null
+          Promise.all [runningOld, runningNew]
+        .then ([oldResult, newResult]) -> 
+          onResult oldErr, newErr, oldResult, newResult
+        .then (result) -> if after? then after(result) else result        
   
   else
     return (args..., cb) ->
-      oldErr = null
-      newErr = null
+      (if before? then before else doNothingAsync) args..., (err, result) ->
+        if err?
+          return cb err
+        
+        if before?
+          args = [result]
 
-      oldResult = null
-      newResult = null
+        oldErr = null
+        newErr = null
 
-      oldFinished = false
-      newFinished = false
+        oldResult = null
+        newResult = null
 
-      onFinish = () ->
-        return if not oldFinished or not newFinished
-        try
-          result = onResult oldErr, newErr, oldResult, newResult
-          return cb null, result
-        catch ex
-          return cb ex
+        oldFinished = false
+        newFinished = false
 
-      oldFn args..., (err, result) ->
-        oldErr = err
-        oldResult = result
-        oldFinished = true
-        onFinish()
+        onFinish = () ->
+          return if not oldFinished or not newFinished
+          try
+            result = onResult oldErr, newErr, oldResult, newResult
+          catch ex
+            return cb ex
 
-      newFn args..., (err, result) ->
-        newErr = err
-        newResult = result
-        newFinished = true
-        onFinish()
+          (if after? then after else doNothingAsync) result, (err, afterResult) ->
+            if err?
+              return cb err
+            if after?
+              result = afterResult
+            return cb null, result
+
+        oldFn args..., (err, result) ->
+          oldErr = err
+          oldResult = result
+          oldFinished = true
+          onFinish()
+
+        newFn args..., (err, result) ->
+          newErr = err
+          newResult = result
+          newFinished = true
+          onFinish()
 
 module.exports = twinning
 module.exports.defaults = (defaults) -> (params) ->
   for k, v of defaults
     params[k] ?= v
   return twinning params
+
+doNothingAsync = (args..., cb) -> cb null

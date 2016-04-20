@@ -1,6 +1,8 @@
 diff = require("deep-diff").diff
 
-twinning = ({name, newFn, oldFn, onError, onDiffs, ignore, sync, promises}) ->
+twinning = ({name, newFn, oldFn, onError, onDiffs, ignore, sync, promises, promiseLib}) ->
+
+  Promise = promiseLib or global.Promise
 
   onResult = (oldErr, newErr, oldResult, newResult) ->
     if newErr or oldErr

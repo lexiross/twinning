@@ -410,7 +410,7 @@ describe "when `after` is provided", ->
 
 describe "when `disabled` is set", ->
 
-  multi "does not run `newFn`", (run) ->
+  multi "does not run `newFn`, `onDiffs`, or `onError` and returns `oldFn` result", (run) ->
     newFn = sinon.stub()
     params =
       name: "TestFunction"
@@ -419,12 +419,60 @@ describe "when `disabled` is set", ->
       oldFn: (arg) -> arg + 1
       newFn: newFn
       after: (arg) -> arg + 1
+      onError: sinon.stub()
+      onDiffs: sinon.stub()
 
     run params, [0], (err, result) ->
       expect(err).to.be(null)
       expect(result).to.be(3)
 
       sinon.assert.notCalled(newFn)
+      sinon.assert.notCalled(params.onError)
+      sinon.assert.notCalled(params.onDiffs)
 
+  describe "when `before` throws", (run) ->
+
+    multi "does not run `newFn`, `onDiffs`, or `onError` and throws `before` error", (run) ->
+      newFn = sinon.stub()
+      params =
+        name: "TestFunction"
+        disabled: true
+        before: () -> throw beforeError
+        oldFn: (arg) -> arg + 1
+        newFn: newFn
+        after: (arg) -> arg + 1
+        onError: sinon.stub()
+        onDiffs: sinon.stub()
+
+      run params, [0], (err, result) ->
+        expect(err).to.be(beforeError)
+        expect(result).to.be(undefined)
+
+        sinon.assert.notCalled(newFn)
+        sinon.assert.notCalled(params.onError)
+        sinon.assert.notCalled(params.onDiffs)
+
+
+  describe "when `oldFn` throws", (run) ->
+
+    multi "does not run `newFn`, `onDiffs`, or `onError` and throws `oldFn` error", (run) ->
+      newFn = sinon.stub()
+      params =
+        name: "TestFunction"
+        disabled: true
+        before: (arg) -> arg + 1
+        oldFn: () -> throw oldError
+        newFn: newFn
+        after: (arg) -> arg + 1
+        onError: sinon.stub()
+        onDiffs: sinon.stub()
+
+      run params, [0], (err, result) ->
+        expect(err).to.be(oldError)
+        expect(result).to.be(undefined)
+
+        sinon.assert.notCalled(newFn)
+        sinon.assert.notCalled(params.onError)
+        sinon.assert.notCalled(params.onDiffs)
 
 

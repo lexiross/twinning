@@ -1,10 +1,13 @@
 diff = require("deep-diff").diff
 
-twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, ignore, sync, promises, promiseLib}) ->
+twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, disabled, ignore, sync, promises, promiseLib}) ->
 
   Promise = promiseLib or global.Promise
 
   onResult = (oldErr, newErr, oldResult, newResult) ->
+    if disabled
+      return oldResult
+    
     if newErr or oldErr
       if onError?
         onError name, oldErr, newErr
@@ -37,10 +40,11 @@ twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, ignore, sync, 
       catch err
         oldErr = err
 
-      try
-        newResult = newFn fnInput...
-      catch err
-        newErr = err
+      if not disabled
+        try
+          newResult = newFn fnInput...
+        catch err
+          newErr = err
 
       result = onResult oldErr, newErr, oldResult, newResult
       
@@ -66,14 +70,18 @@ twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, ignore, sync, 
             .catch (err) ->
               oldErr = err
               return null
+          
+          if disabled
+            return Promise.all [runningOld]
+          
           runningNew = newFn input...
             .catch (err) ->
               newErr = err
               return null
           Promise.all [runningOld, runningNew]
-        .then ([oldResult, newResult]) -> 
+        .then ([oldResult, newResult]) ->
           onResult oldErr, newErr, oldResult, newResult
-        .then (result) -> if after? then after(result) else result        
+        .then (result) -> if after? then after(result) else result
   
   else
     return (args..., cb) ->
@@ -91,7 +99,7 @@ twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, ignore, sync, 
         newResult = null
 
         oldFinished = false
-        newFinished = false
+        newFinished = disabled?
 
         onFinish = () ->
           return if not oldFinished or not newFinished
@@ -113,11 +121,12 @@ twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, ignore, sync, 
           oldFinished = true
           onFinish()
 
-        newFn args..., (err, result) ->
-          newErr = err
-          newResult = result
-          newFinished = true
-          onFinish()
+        if not disabled
+          newFn args..., (err, result) ->
+            newErr = err
+            newResult = result
+            newFinished = true
+            onFinish()
 
 module.exports = twinning
 module.exports.defaults = (defaults) -> (params) ->

@@ -1,6 +1,6 @@
 diff = require("deep-diff").diff
 
-twinning = ({name, newFn, oldFn, onError, onDiffs, ignore, sync, promises, promiseLib}) ->
+twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, ignore, sync, promises, promiseLib}) ->
 
   Promise = promiseLib or global.Promise
 
@@ -22,65 +22,74 @@ twinning = ({name, newFn, oldFn, onError, onDiffs, ignore, sync, promises, promi
       throw oldErr
     return oldResult
 
-  handleAsync = (oldPromise, newPromise) ->
-    oldErr = null
-    newErr = null
+  if sync
+    return (args...) ->
+      oldErr = null
+      newErr = null
 
-    runningOld = oldPromise
-      .catch (err) ->
+      try
+        oldResult = oldFn args...
+      catch err
         oldErr = err
-        return null
 
-    runningNew = newPromise
-      .catch (err) ->
+      try
+        newResult = newFn args...
+      catch err
         newErr = err
-        return null
 
-    Promise.all [runningOld, runningNew]
-      .then ([oldResult, newResult]) -> onResult oldErr, newErr, oldResult, newResult
+      return onResult oldErr, newErr, oldResult, newResult
+  
+  else if promises
+    return (args...) ->
+      oldErr = null
+      newErr = null
 
-  handleSync = (args) ->
-    oldErr = null
-    newErr = null
+      runningOld = oldFn args...
+        .catch (err) ->
+          oldErr = err
+          return null
 
-    try
-      oldResult = oldFn args...
-    catch err
-      oldErr = err
+      runningNew = newFn args...
+        .catch (err) ->
+          newErr = err
+          return null
 
-    try
-      newResult = newFn args...
-    catch err
-      newErr = err
+      Promise.all [runningOld, runningNew]
+        .then ([oldResult, newResult]) -> onResult oldErr, newErr, oldResult, newResult
+  
+  else
+    return (args..., cb) ->
+      oldErr = null
+      newErr = null
 
-    return onResult oldErr, newErr, oldResult, newResult
+      oldResult = null
+      newResult = null
 
-  return (args...) ->
-    usingCb = not sync and not promises
+      oldFinished = false
+      newFinished = false
 
-    if usingCb
-      [args..., cb] = args
+      onFinish = () ->
+        return if not oldFinished or not newFinished
+        try
+          result = onResult oldErr, newErr, oldResult, newResult
+          return cb null, result
+        catch ex
+          return cb ex
 
-      oldPromise = fromCallback (next) -> oldFn args..., next
-      newPromise = fromCallback (next) -> newFn args..., next
-      asCallback handleAsync(oldPromise, newPromise), cb
-    else if promises
-      return handleAsync (oldFn args...), (newFn args...)
-    else if sync
-      return handleSync(args)
+      oldFn args..., (err, result) ->
+        oldErr = err
+        oldResult = result
+        oldFinished = true
+        onFinish()
+
+      newFn args..., (err, result) ->
+        newErr = err
+        newResult = result
+        newFinished = true
+        onFinish()
 
 module.exports = twinning
 module.exports.defaults = (defaults) -> (params) ->
   for k, v of defaults
     params[k] ?= v
   return twinning params
-
-fromCallback = (fn) ->
-  return new Promise (resolve, reject) ->
-    fn (err, result) ->
-      if err?
-        return reject err
-      resolve result
-
-asCallback = (promise, cb) ->
-  promise.then cb.bind(null, null), cb

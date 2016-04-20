@@ -28,8 +28,8 @@ multi = (description, runner) ->
   
   it "#{description} (callbacks)", (done) ->
     runner (params, evaluate) ->
-      params.oldFn = (cb) -> cb params.oldError, params.oldResult
-      params.newFn = (cb) -> cb params.newError, params.newResult
+      params.oldFn = (cb) -> cb params.oldError or null, params.oldResult
+      params.newFn = (cb) -> cb params.newError or null, params.newResult
       twinning(params) (err, result) ->
         try 
           evaluate(err, result)

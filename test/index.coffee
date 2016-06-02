@@ -21,7 +21,7 @@ newError = new Error("New error")
 evaluationError = new Error("Evalutation error")
 afterError = new Error("After error")
 
-callbackify = (syncFn) -> 
+callbackify = (syncFn) ->
   (args..., cb) ->
     setTimeout ->
       try
@@ -34,11 +34,11 @@ callbackify = (syncFn) ->
 promisify = (syncFn) -> (args...) ->
   return Promise.resolve().then () -> syncFn args...
 
-# `multi` will convert your params into three different sets of params, one for 
+# `multi` will convert your params into three different sets of params, one for
 # callbacks, one for promises, and one for synchronous functions, and call your evalutation
 # callback with the appropriate values for each.
 multi = (description, runner) ->
-  
+
   it "#{description} (callbacks)", (done) ->
     runner (params, args, evaluate) ->
       if not evaluate?
@@ -51,12 +51,12 @@ multi = (description, runner) ->
       params.after = callbackify params.after if params.after?
 
       twinning(params) args..., (err, result) ->
-        try 
+        try
           evaluate(err, result)
         catch err
           return done(err)
         done()
-  
+
   it "#{description} (promises)", ->
     runner (params, args, evaluate) ->
       if not evaluate?
@@ -64,7 +64,7 @@ multi = (description, runner) ->
         args = []
 
       params.promises = true
-      
+
       params.oldFn = promisify params.oldFn
       params.newFn = promisify params.newFn
       params.before = promisify params.before if params.before?
@@ -79,7 +79,7 @@ multi = (description, runner) ->
         evaluate = args
         args = []
 
-      params.sync = true      
+      params.sync = true
       err = null
       try
         result = twinning(params) args...
@@ -112,11 +112,11 @@ describe "when new and old functions return different data", ->
       newFn: () -> newResult
       onError: sinon.stub()
       onDiffs: sinon.stub()
-    run params, (err, result) ->
+    run params, [1], (err, result) ->
       expect(err).to.be(null)
       expect(result).to.be(oldResult)
 
-      sinon.assert.calledWith(params.onDiffs, params.name, diffs)
+      sinon.assert.calledWith(params.onDiffs, params.name, [1], diffs)
       sinon.assert.notCalled(params.onError)
 
   describe "when `onDiffs` throws", ->
@@ -132,7 +132,7 @@ describe "when new and old functions return different data", ->
         expect(err).to.be(oldError)
         expect(result).to.be(undefined)
 
-        sinon.assert.calledWith(params.onDiffs, params.name, diffs)
+        sinon.assert.calledWith(params.onDiffs, params.name, [], diffs)
         sinon.assert.notCalled(params.onError)
 
   describe "when `ignore` option is set", ->
@@ -151,7 +151,7 @@ describe "when new and old functions return different data", ->
           expect(err).to.be(null)
           expect(result).to.be(oldResult)
 
-          sinon.assert.calledWith(params.onDiffs, params.name, diffs)
+          sinon.assert.calledWith(params.onDiffs, params.name, [], diffs)
           sinon.assert.notCalled(params.onError)
 
     describe "when some diffs match predicate", ->
@@ -168,13 +168,13 @@ describe "when new and old functions return different data", ->
           expect(err).to.be(null)
           expect(result).to.be(oldResult)
 
-          sinon.assert.calledWithMatch(params.onDiffs, params.name, diffs.slice(1))
+          sinon.assert.calledWithMatch(params.onDiffs, params.name, [], diffs.slice(1))
           sinon.assert.notCalled(params.onError)
 
     describe "when all diffs match predicate", ->
 
       multi "does not call `onDiffs`", (run) ->
-        params = 
+        params =
           name: "TestFunction"
           oldFn: () -> oldResult
           newFn: () -> newResult
@@ -201,7 +201,7 @@ describe "when new function errors", ->
       expect(err).to.be(null)
       expect(result).to.be(oldResult)
 
-      sinon.assert.calledWithMatch(params.onError, params.name, null, newError)
+      sinon.assert.calledWithMatch(params.onError, params.name, [], null, newError)
       sinon.assert.notCalled(params.onDiffs)
 
   describe "when `onError` throws", ->
@@ -217,7 +217,7 @@ describe "when new function errors", ->
         expect(err).to.be(evaluationError)
         expect(result).to.be(undefined)
 
-        sinon.assert.calledWithMatch(params.onError, params.name, null, newError)
+        sinon.assert.calledWithMatch(params.onError, params.name, [], null, newError)
         sinon.assert.notCalled(params.onDiffs)
 
 
@@ -234,7 +234,7 @@ describe "when old function errors", ->
       expect(err).to.be(oldError)
       expect(result).to.be(undefined)
 
-      sinon.assert.calledWithMatch(params.onError, params.name, oldError, null)
+      sinon.assert.calledWithMatch(params.onError, params.name, [], oldError, null)
       sinon.assert.notCalled(params.onDiffs)
 
   describe "when `onError` throws", ->
@@ -250,7 +250,7 @@ describe "when old function errors", ->
         expect(err).to.be(evaluationError)
         expect(result).to.be(undefined)
 
-        sinon.assert.calledWithMatch(params.onError, params.name, oldError, null)
+        sinon.assert.calledWithMatch(params.onError, params.name, [], oldError, null)
         sinon.assert.notCalled(params.onDiffs)
 
 describe "when old and new functions both error", ->
@@ -266,7 +266,7 @@ describe "when old and new functions both error", ->
       expect(err).to.be(oldError)
       expect(result).to.be(undefined)
 
-      sinon.assert.calledWithMatch(params.onError, params.name, oldError, newError)
+      sinon.assert.calledWithMatch(params.onError, params.name, [], oldError, newError)
       sinon.assert.notCalled(params.onDiffs)
 
   describe "when `onError` throws", ->
@@ -282,14 +282,14 @@ describe "when old and new functions both error", ->
         expect(err).to.be(evaluationError)
         expect(result).to.be(undefined)
 
-        sinon.assert.calledWithMatch(params.onError, params.name, oldError, newError)
+        sinon.assert.calledWithMatch(params.onError, params.name, [], oldError, newError)
         sinon.assert.notCalled(params.onDiffs)
 
 describe "when neither `before` nor `after` is provided", ->
 
   multi "calls oldFn and newFn with given arguments", (run) ->
     originalArgs = [1, 2, 3]
-    
+
     oldFn = sinon.stub()
     newFn = sinon.stub()
 
@@ -323,7 +323,7 @@ describe "when `before` is provided", ->
       newFn: newFn
       onError: sinon.stub()
       onDiffs: sinon.stub()
-    
+
     run params, originalArgs, (err) ->
       expect(err).to.be(null)
 
@@ -345,7 +345,7 @@ describe "when `before` is provided", ->
         after: after
         onError: sinon.stub()
         onDiffs: sinon.stub()
-      
+
       run params, [0], (err, result) ->
         expect(err).to.be(beforeError)
         expect(result).to.be(undefined)
@@ -379,7 +379,7 @@ describe "when `after` is provided", ->
 
     multi "does not call `after`", (run) ->
       after = sinon.stub()
-      
+
       params =
         name: "TestFunction"
         before: () -> null

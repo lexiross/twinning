@@ -1,7 +1,7 @@
 {
   "name": "twinning",
   "description": "compare results of two methods",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "author": "Lexi Ross",
   "main": "./lib",
   "homepage": "https://github.com/lexiross/twinning#readme",

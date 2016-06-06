@@ -4,11 +4,11 @@ twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, disabled, igno
 
   Promise = promiseLib or global.Promise
 
-  onResult = (oldErr, newErr, oldResult, newResult) ->
+  onResult = (args, oldErr, newErr, oldResult, newResult) ->
     if not disabled
       if newErr or oldErr
         if onError?
-          onError name, oldErr, newErr
+          onError name, args, oldErr, newErr
       else
         diffs = diff oldResult, newResult
 
@@ -16,7 +16,7 @@ twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, disabled, igno
           diffs = diffs?.filter (diff) -> not ignore(diff)
 
         if diffs?.length > 0 and onDiffs?
-          onDiffs name, diffs
+          onDiffs name, args, diffs
 
     if oldErr
       throw oldErr
@@ -43,13 +43,13 @@ twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, disabled, igno
         catch err
           newErr = err
 
-      result = onResult oldErr, newErr, oldResult, newResult
-      
+      result = onResult args, oldErr, newErr, oldResult, newResult
+
       if after?
         return after result
       else
         return result
-  
+
   else if promises
     return (args...) ->
       oldErr = null
@@ -67,25 +67,25 @@ twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, disabled, igno
             .catch (err) ->
               oldErr = err
               return null
-          
+
           if disabled
             return Promise.all [runningOld]
-          
+
           runningNew = newFn input...
             .catch (err) ->
               newErr = err
               return null
           Promise.all [runningOld, runningNew]
         .then ([oldResult, newResult]) ->
-          onResult oldErr, newErr, oldResult, newResult
+          onResult args, oldErr, newErr, oldResult, newResult
         .then (result) -> if after? then after(result) else result
-  
+
   else
     return (args..., cb) ->
       (if before? then before else doNothingAsync) args..., (err, result) ->
         if err?
           return cb err
-        
+
         if before?
           args = [result]
 
@@ -101,7 +101,7 @@ twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, disabled, igno
         onFinish = () ->
           return if not oldFinished or not newFinished
           try
-            result = onResult oldErr, newErr, oldResult, newResult
+            result = onResult args, oldErr, newErr, oldResult, newResult
           catch ex
             return cb ex
 

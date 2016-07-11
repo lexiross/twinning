@@ -96,7 +96,7 @@ twinning = ({name, newFn, oldFn, before, after, onError, onDiffs, disabled, igno
         newResult = null
 
         oldFinished = false
-        newFinished = disabled?
+        newFinished = disabled
 
         onFinish = () ->
           return if not oldFinished or not newFinished
